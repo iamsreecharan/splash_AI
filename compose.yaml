@@ -1,0 +1,136 @@
+name: splash
+
+x-app: &app
+  image: splash-backend:local
+  build:
+    context: ./backend
+  env_file: .env
+  # Exported runtime/settings bindings take precedence over the local .env.
+  # Forward configuration explicitly without copying credential values to files.
+  environment:
+    SPLASH_ENV: ${SPLASH_ENV:-development}
+    SPLASH_DEMO_MODE: ${SPLASH_DEMO_MODE:-true}
+    SPLASH_DATABASE_URL: ${SPLASH_DATABASE_URL:-postgresql+psycopg://splash:splash-local-only@postgres:5432/splash}
+    SPLASH_REDIS_URL: ${SPLASH_REDIS_URL:-redis://redis:6379/0}
+    SPLASH_CORS_ORIGINS: '${SPLASH_CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173"]}'
+    SPLASH_PUBLIC_API_URL: ${SPLASH_PUBLIC_API_URL:-http://localhost:8000}
+    SPLASH_WEB_URL: ${SPLASH_WEB_URL:-http://localhost:5173}
+    SPLASH_SUPABASE_URL: ${SPLASH_SUPABASE_URL:-}
+    SPLASH_SUPABASE_ANON_KEY: ${SPLASH_SUPABASE_ANON_KEY:-}
+    SPLASH_GITHUB_APP_ID: ${SPLASH_GITHUB_APP_ID:-}
+    SPLASH_GITHUB_APP_SLUG: ${SPLASH_GITHUB_APP_SLUG:-}
+    SPLASH_GITHUB_CLIENT_ID: ${SPLASH_GITHUB_CLIENT_ID:-}
+    SPLASH_GITHUB_CLIENT_SECRET: ${SPLASH_GITHUB_CLIENT_SECRET:-}
+    SPLASH_GITHUB_WEBHOOK_SECRET: ${SPLASH_GITHUB_WEBHOOK_SECRET:-}
+    SPLASH_GITHUB_PRIVATE_KEY_PATH: ${SPLASH_GITHUB_PRIVATE_KEY_PATH:-}
+    SPLASH_GITHUB_PRIVATE_KEY: ${SPLASH_GITHUB_PRIVATE_KEY:-}
+    SPLASH_TOKEN_ENCRYPTION_KEY: ${SPLASH_TOKEN_ENCRYPTION_KEY:-}
+    SPLASH_AI_ENABLED: ${SPLASH_AI_ENABLED:-false}
+    SPLASH_OPENAI_API_KEY: ${SPLASH_OPENAI_API_KEY:-}
+    SPLASH_OPENAI_MODEL: ${SPLASH_OPENAI_MODEL:-gpt-4.1-mini}
+    SPLASH_AI_MAX_INPUT_TOKENS: ${SPLASH_AI_MAX_INPUT_TOKENS:-6000}
+    SPLASH_AI_MAX_OUTPUT_TOKENS: ${SPLASH_AI_MAX_OUTPUT_TOKENS:-700}
+    SPLASH_AI_MAX_SNIPPETS: ${SPLASH_AI_MAX_SNIPPETS:-8}
+    SPLASH_AI_MAX_SNIPPET_CHARS: ${SPLASH_AI_MAX_SNIPPET_CHARS:-1800}
+    SPLASH_AI_MAX_REQUEST_USD: ${SPLASH_AI_MAX_REQUEST_USD:-0.02}
+    SPLASH_AI_MAX_TOTAL_USD: ${SPLASH_AI_MAX_TOTAL_USD:-0.02}
+    SPLASH_MAX_REPOSITORY_FILES: ${SPLASH_MAX_REPOSITORY_FILES:-1000}
+    SPLASH_MAX_REPOSITORY_BYTES: ${SPLASH_MAX_REPOSITORY_BYTES:-8000000}
+    SPLASH_MAX_FILE_BYTES: ${SPLASH_MAX_FILE_BYTES:-150000}
+    SPLASH_MAX_WEBHOOK_BYTES: ${SPLASH_MAX_WEBHOOK_BYTES:-1000000}
+    SPLASH_MAX_SNAPSHOTS_PER_REPOSITORY: ${SPLASH_MAX_SNAPSHOTS_PER_REPOSITORY:-10}
+  # Match the host user when mounting a mode-600 GitHub private-key file.
+  user: "${SPLASH_RUNTIME_UID:-10001}:${SPLASH_RUNTIME_GID:-10001}"
+  volumes:
+    - ./.secrets:/run/splash-secrets:ro
+  restart: unless-stopped
+  init: true
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-splash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-splash-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-splash}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    <<: *app
+    command: ["sh", "-ec", "python -m app.bootstrap; exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+      start_period: 10s
+
+  worker:
+    <<: *app
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    <<: *app
+    command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info", "--schedule=/tmp/splash-celerybeat"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

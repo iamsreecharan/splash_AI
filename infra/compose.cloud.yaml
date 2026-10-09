@@ -1,0 +1,51 @@
+# Add only in the managed Codex cloud machine. Do not copy its CA into images.
+# docker compose -f compose.yaml -f infra/compose.cloud.yaml up --build -d
+services:
+  backend:
+    build:
+      secrets:
+        - ca_bundle
+    environment:
+      SSL_CERT_FILE: /run/cloud-ca-bundle.pem
+      REQUESTS_CA_BUNDLE: /run/cloud-ca-bundle.pem
+      NO_PROXY: localhost,127.0.0.1,backend,postgres,redis,frontend
+      no_proxy: localhost,127.0.0.1,backend,postgres,redis,frontend
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/run/cloud-ca-bundle.pem:ro
+  worker:
+    build:
+      secrets:
+        - ca_bundle
+    environment:
+      SSL_CERT_FILE: /run/cloud-ca-bundle.pem
+      REQUESTS_CA_BUNDLE: /run/cloud-ca-bundle.pem
+      NO_PROXY: localhost,127.0.0.1,backend,postgres,redis,frontend
+      no_proxy: localhost,127.0.0.1,backend,postgres,redis,frontend
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/run/cloud-ca-bundle.pem:ro
+  scheduler:
+    build:
+      secrets:
+        - ca_bundle
+    environment:
+      SSL_CERT_FILE: /run/cloud-ca-bundle.pem
+      REQUESTS_CA_BUNDLE: /run/cloud-ca-bundle.pem
+      NO_PROXY: localhost,127.0.0.1,backend,postgres,redis,frontend
+      no_proxy: localhost,127.0.0.1,backend,postgres,redis,frontend
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/run/cloud-ca-bundle.pem:ro
+  frontend:
+    build:
+      secrets:
+        - proxy_ca
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/cloud-proxy-ca.pem
+      NO_PROXY: localhost,127.0.0.1,backend,postgres,redis,frontend
+      no_proxy: localhost,127.0.0.1,backend,postgres,redis,frontend
+    volumes:
+      - ${CODEX_PROXY_CERT:?CODEX_PROXY_CERT must name the managed proxy CA}:/run/cloud-proxy-ca.pem:ro
+secrets:
+  ca_bundle:
+    file: /etc/ssl/certs/ca-certificates.crt
+  proxy_ca:
+    file: ${CODEX_PROXY_CERT:?CODEX_PROXY_CERT must name the managed proxy CA}

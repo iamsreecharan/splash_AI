@@ -1,0 +1,533 @@
+{
+  "dataset": "supported-static-http-contracts-v1",
+  "cases": 74,
+  "passed": 74,
+  "precision": 1.0,
+  "recall": 1.0,
+  "evidence_faithfulness": 1.0,
+  "evidence_items_checked": 133,
+  "true_positive": 34,
+  "false_positive": 0,
+  "false_negative": 0,
+  "limitations": "Synthetic cases cover explicit FastAPI literal routes and named fetch/json bindings. Metrics do not establish general repository or runtime accuracy.",
+  "outcomes": [
+    {
+      "name": "rename-total-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-total-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-total-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-total-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-total",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-total",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-total",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-total",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-temperature-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-temperature-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-temperature-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-temperature-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-temperature",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-temperature",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-temperature",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-temperature",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-status-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-status-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-status-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-status-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-status",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-status",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-status",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-status",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-email-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-email-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-email-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-email-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-email",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-email",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-email",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-email",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-quantity-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-quantity-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-quantity-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-quantity-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-quantity",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-quantity",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-quantity",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-quantity",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-latency-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-latency-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-latency-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-latency-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-latency",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-latency",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-latency",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-latency",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-priority-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-priority-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-priority-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-priority-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-priority",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-priority",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-priority",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-priority",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "rename-balance-dot",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-balance-direct",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-balance-destructure",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "rename-balance-bracket",
+      "category": "field-removal",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "safe-addition-balance",
+      "category": "safe-addition",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "updated-consumer-balance",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "other-endpoint-balance",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "local-token-balance",
+      "category": "unrelated-symbol",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "endpoint-rename",
+      "category": "endpoint-change",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "endpoint-removal",
+      "category": "endpoint-change",
+      "passed": true,
+      "expected_alerts": 1,
+      "actual_alerts": 1
+    },
+    {
+      "name": "coordinated-endpoint-rename",
+      "category": "coordinated-migration",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "external-endpoint",
+      "category": "unrelated-endpoint",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "syntax-error-unknown",
+      "category": "ambiguous-producer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "dynamic-route-unknown",
+      "category": "ambiguous-producer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "generated-head-unknown",
+      "category": "excluded-producer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "reassigned-payload",
+      "category": "ambiguous-consumer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "locally-overwritten-field",
+      "category": "ambiguous-consumer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    },
+    {
+      "name": "shadowed-fetch",
+      "category": "ambiguous-consumer",
+      "passed": true,
+      "expected_alerts": 0,
+      "actual_alerts": 0
+    }
+  ]
+}
