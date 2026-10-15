@@ -112,9 +112,11 @@ npm test
 ```
 
 The smoke check exercises HTTP, the queue, persistent storage, indexing, the
-four-stage workflow, evidence, feedback, and a harmless-change control. The
-backend suite verifies deletion cascades and the browser suite checks the user
-flow. `python3 scripts/smoke.py --verify-deletion` also verifies erasure against
+four-stage workflow, source evidence, report downloads, history filters and
+pagination, feedback, and a harmless-change control. The backend suite checks
+authorization and deletion cascades; browser tests cover history search,
+downloading a report, and browsing pages on mobile, as well as the alert flow.
+`python3 scripts/smoke.py --verify-deletion` also verifies erasure against
 the running database; it permanently deletes the sample's active data. The UI/API
 repository removal action is available for other repositories.
 External GitHub OAuth/webhooks, Supabase login, and OpenAI calls require actual

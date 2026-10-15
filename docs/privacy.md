@@ -19,6 +19,17 @@ oversized files, and unsupported languages are excluded during indexing. These
 filters reduce accidental disclosure; code can still contain inline secrets or
 personal data. Review repositories before allowing any hosted processing.
 
+## Downloaded reports
+
+You can download a completed analysis as a Markdown file. The report includes
+repository and PR details, findings, and the stored source excerpts behind them.
+Downloads require the same current access as viewing those results in the app.
+Creating a report doesn't send anything to an AI provider.
+
+Treat reports as copies of your repository's private source. Splash doesn't
+upload or share them for you. Removing a project or revoking access can't erase
+a file you've already downloaded or shared.
+
 ## OpenAI opt-in
 
 Set `SPLASH_AI_ENABLED=true` only after setting `SPLASH_OPENAI_API_KEY` in the

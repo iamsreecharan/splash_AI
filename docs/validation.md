@@ -1,4 +1,4 @@
-# V1 validation and remaining setup
+# What we've checked
 
 The local development workflow was exercised in the cloud workspace using the
 actual six-service Docker stack: API, worker, recovery scheduler, web app,
@@ -7,11 +7,11 @@ that the worker completed; readiness was also checked through functional jobs.
 
 | Check | Result |
 | --- | --- |
-| Python backend, analysis, retrieval, authorization, OAuth and queue tests | 166 passed |
-| Frontend API handling and account isolation tests | 5 passed |
+| Python backend, analysis, retrieval, authorization, OAuth, queue, history and report tests | 187 passed |
+| Frontend API handling, account isolation, history and report tests | 21 passed |
 | TypeScript/production frontend build | Passed |
-| Browser evidence/feedback, harmless change and mobile navigation | 3 passed |
-| Docker workflow, exact source excerpts, feedback and erasure | 14 passed |
+| Browser evidence/feedback, history, report download, pagination and mobile navigation | 5 passed |
+| Docker workflow, exact source excerpts, reports, history, feedback and erasure | 20 passed |
 | PostgreSQL vector storage, cosine retrieval and tenant scope | 3 passed with synthetic vectors; transaction rolled back |
 | Controlled impact evaluation | 74 of 74 scenarios passed |
 | Reusable installation script | Executed successfully with hash/frozen-lock installation |
@@ -22,6 +22,16 @@ faithfulness are each 1.0 **on this synthetic dataset**. These measurements are
 not general accuracy estimates for arbitrary repositories. See
 [evaluation details](../backend/evals/README.md) and
 [the machine-readable report](../backend/evals/report.json).
+
+The history and report checks cover combined filters, literal search characters,
+stable ordering, page counts, revoked GitHub access, and workspace isolation.
+Reports are checked against the selected run's stored excerpts, including a
+harmless run with no findings. Browser tests download a real Markdown file and
+browse a second history page on a phone-sized screen. Frontend tests also check
+that a late response can't display or download a previous account's data.
+
+This extension doesn't change the database schema or add dependencies. Report
+downloads read existing results; they don't make model calls.
 
 Initial deterministic detection covers supported literal FastAPI endpoints and
 response shapes consumed through proven JavaScript/TypeScript fetch/json
@@ -50,9 +60,8 @@ were not exercised without those account settings. Authorization, revocation,
 signed webhook replay, and provider behavior were tested with controlled mocks.
 No hosted deployment has been validated.
 
-The cloud environment draft adds `api.github.com` and `api.openai.com` to its
-custom network domains and saves complete installation/startup instructions.
-Review and save that draft in environment settings, then publish it to activate
-the reusable configuration. Add your exact Supabase project hostname when
-configuring hosted authentication. Draft saving does not activate networking,
-publish a snapshot, or establish readiness in a fresh task.
+For a managed cloud workspace, follow the trust and startup instructions in
+[local development](local-development.md). Its network policy must allow
+`api.github.com` for live repositories, your exact Supabase project hostname for
+authentication, and `api.openai.com` if you enable AI. Local fixture checks don't
+verify those external connections.

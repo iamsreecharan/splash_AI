@@ -1,57 +1,98 @@
 # Splash
 
-Know what changed. Understand what breaks.
+Splash helps you find the other code a pull request might break.
 
-Splash V1 is a local-first web app and read-only GitHub App for a small private
-pilot. It indexes Python and JavaScript/TypeScript code, follows dependencies
-across files, analyzes pull requests in a background worker, and presents
-source-linked impact alerts with feedback and deletion controls. The workflow
-runs without an AI key; optional OpenAI analysis is explicitly enabled.
+For example, a backend PR renames a JSON field from `temperature` to
+`current_temperature`, but the frontend still reads `machine.temperature`.
+Splash points out the mismatch and shows the source lines on both sides, so you
+can check the finding yourself.
 
-V1 ships the web app and GitHub integration. Linear, Slack, editor integrations,
-chat, automated patches, and a browser extension are future releases.
+The app runs locally. You can try the sample project without creating accounts
+or paying for an AI API. GitHub and OpenAI connections are optional setup steps.
 
-## Run locally for free
+## Try it
 
-Requires Docker Engine/Desktop with Compose v2, Git, and Python 3 for the smoke
-check. About 4 GB of free memory is a practical starting point for the stack.
-From this checkout:
+You'll need Git, Make, Docker with Compose v2, and Python 3 for the smoke check.
+The commands below use a Linux, macOS, or WSL shell. Allow about 4 GB of free
+memory for the containers.
 
 ```sh
+git clone https://github.com/iamsreecharan/splash_AI.git
+cd splash_AI
 make up
-make smoke
 ```
 
-`make up` preserves an existing `.env`, creates a private `.secrets` directory,
-builds the applications, initializes PostgreSQL 16/pgvector, and starts Redis,
-FastAPI, a Celery worker/recovery scheduler, and the Vite web server. All published
-ports bind to loopback.
-Open `http://localhost:5173` on your own computer. Local demo access is explicit;
-it is unsuitable for a publicly accessible server. Use the sample controls in
-the app to index the fixture and analyze an unsafe rename or a harmless change.
+Open **http://localhost:5173** on your computer and choose **Try sample project**.
+Try the field rename, then the harmless change. Both go through the real indexer
+and analysis worker using the bundled source files.
 
-The local demo uses actual indexing and analysis of fixture source files. It
-does not connect to GitHub, send code to OpenAI, or prove external credentials.
-The GitHub App and Supabase setup are documented separately below.
+In **Analysis History**, you can find older runs by project, status, title, or PR
+number. Open a completed analysis and choose **Download report** to save its
+findings and source excerpts as Markdown. Reports also record when a supported
+analysis found no impacts.
 
-Verified deterministic findings currently focus on FastAPI HTTP route/JSON-field
-contracts consumed by literal JavaScript/TypeScript `fetch` calls. Dynamic URLs,
-indirect client wrappers, unsupported frameworks, and other code relationships
-may need investigation. Indexing a language does not guarantee every kind of
-breaking change in that language will be detected.
+`make up` creates `.env` if you don't have one, builds the app, and starts the
+database, queue, API, background workers, and web server. It keeps an existing
+`.env`. Services bind to localhost. Keep demo mode on your own machine; configure
+authentication before exposing the app to other people.
 
 ```sh
-make logs                # inspect startup and worker failures
-make down                # stop containers; keep database and queue volumes
-docker compose down -v   # permanently delete this local stack's data
+make smoke               # check the running API and analysis worker
+make logs                # watch service logs
+make down                # stop the app and keep its data
 ```
 
-## Develop and test
+To start over completely, `docker compose down -v` deletes this stack's database
+and queue volumes.
 
-The services can run in Docker while Python and Node run on the host with fast
-reload. Follow [local setup](docs/local-development.md) for pinned installation,
-startup, checks, and managed-cloud trust configuration. See
-[architecture](docs/architecture.md) for the HTTP and analysis contracts.
+## What's working
+
+- A dashboard for connected projects, alerts, and recent activity.
+- A read-only GitHub App connection, repository indexing, and PR webhooks.
+- Python and JavaScript/TypeScript source indexing, with source and documentation
+  search and optional semantic retrieval through pgvector.
+- Background analysis that checks changes, follows supported dependencies,
+  verifies evidence, and suggests what to review.
+- Alerts with exact source excerpts, useful/irrelevant feedback, and resolution
+  tracking.
+- Searchable analysis history and downloadable Markdown reports.
+- Supabase sign-in, separate user workspaces, and repository data deletion.
+- Optional OpenAI explanations with request limits. Paid AI is off by default.
+
+The first release focuses on FastAPI routes and JSON response fields consumed
+through literal JavaScript/TypeScript `fetch` calls. Dynamic URLs, client
+wrappers, other frameworks, and many other kinds of breaking changes aren't
+covered yet. A completed run with no findings doesn't prove that a PR is safe.
+
+Linear, Slack, chat, suggested patches, and editor extensions are still planned.
+
+## Use your own repositories
+
+1. Set up [Supabase Auth](docs/supabase-auth.md), turn off demo mode, and sign in.
+2. Create and install the [GitHub App](docs/github-app.md). GitHub needs a secure
+   tunnel to deliver webhooks to your local app. Follow the guide for callback
+   URLs.
+3. Connect GitHub in Splash, select a repository, and index it. Open or update a
+   pull request to start an analysis.
+
+The app reads repository contents and PRs. It doesn't execute your code, push
+changes, or merge pull requests. Removing a project deletes its stored source,
+analysis history, and alerts from Splash's active database. Downloaded reports
+are separate files; delete those yourself if you no longer need them.
+
+Store credentials in `.env`, `.secrets`, or private environment settings. These
+local files are ignored by Git. See [privacy](docs/privacy.md) for what optional
+AI calls send, [costs](docs/costs.md) for the limits, and
+[security](docs/security.md) for the access model.
+
+## Work on the code
+
+The frontend uses React, TypeScript, and Vite. The backend uses FastAPI,
+PostgreSQL 16 with pgvector, Redis, and Celery. LangGraph connects the four
+analysis stages.
+
+Follow [local development](docs/local-development.md) to install Python and Node
+dependencies and run services with reload. Then run:
 
 ```sh
 make test
@@ -59,26 +100,18 @@ python3 scripts/smoke.py
 cd tests/e2e && npm ci && npx playwright install chromium && npm test
 ```
 
-The smoke command checks the API/worker flow against the running local demo and
-writes its results to the ignored `.splash/` directory. The browser tests exercise
-the web app. Run `python3 scripts/smoke.py --verify-deletion` to check sample
-erasure too, or remove it through the UI/API. Removing
-a repository permanently deletes its active indexed data and analysis history.
+The smoke check uses the running local demo and saves its results in `.splash/`.
+Add `--verify-deletion` to check that removing the sample also erases its stored
+data. That option deletes the sample project.
 
-## Connect real repositories
+[Architecture](docs/architecture.md) describes the API and analysis flow.
+[Validation notes](docs/validation.md) list what has been tested and what still
+needs real account configuration. The local workflow is tested; a live GitHub,
+Supabase, and OpenAI setup still needs to be checked with your account settings.
 
-1. Configure [Supabase Auth](docs/supabase-auth.md), disable demo mode, and sign in.
-2. Create and install the [read-only GitHub App](docs/github-app.md). A local
-   webhook receiver needs a secure tunnel that you configure yourself.
-3. Link your GitHub identity inside Splash, choose an authorized installation,
-   select repositories, and index them. Open or update a pull request to analyze
-   the new commit. Review the result and its source evidence in the app.
+## Hosting later
 
-Read [privacy](docs/privacy.md), [security](docs/security.md), and
-[cost controls](docs/costs.md) before opting in to external AI. Credentials go in
-private environment settings or `.env`/`.secrets`, never in Git or chat.
-
-The recommended initial deployment is local. [Render deployment](docs/deployment.md)
-describes a later private pilot, its required services, and why a reliable
-complete hosted stack should not be assumed free. No cloud resources are created
-by this repository.
+Start locally to keep costs down. The [Render guide](docs/deployment.md) covers
+a hosted pilot, including the database, queue, workers, and authentication.
+Running the whole stack reliably on free hosting isn't assumed, and this repo
+doesn't create cloud resources for you.

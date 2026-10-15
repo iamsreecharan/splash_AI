@@ -35,8 +35,18 @@ development proxy or the deployment reverse proxy.
 - `POST /api/alerts/{id}/feedback`: body `{kind: "useful"|"irrelevant"|"resolved"}`;
   return updated Alert. Resolved sets `status=resolved`, irrelevant sets
   `status=dismissed`, useful records feedback without resolving.
-- `GET /api/runs`: `{items: [Run]}`.
+- `GET /api/runs?status=&repository_id=&q=&kind=&limit=&offset=`:
+  `{items: [Run], total, limit, offset, has_more}`. Search matches a literal
+  substring of the title, repository name, or PR number. Results sort by creation
+  time, then ID, newest first. Counts and pages include only repositories the
+  current user can still access. The default limit is 100; the history page
+  requests 20 at a time.
 - `GET /api/runs/{id}`: Run including stage trace.
+- `GET /api/runs/{id}/report`: a Markdown attachment for a completed analysis.
+  Includes its stages, findings, recommendations, and stored source excerpts.
+  Queued, running, failed, and indexing runs return 409. Downloads recheck current
+  repository access and use `Cache-Control: no-store`. Exporting doesn't call an
+  AI provider or start a new analysis.
 - `GET /api/integrations`: `{github: {configured, connected, app_name},
   openai: {configured, enabled, model}, supabase: {configured}, mode}`.
 - `GET /api/github/install`: `{url}` or actionable 503 configuration detail.
@@ -58,7 +68,7 @@ Alert: `{id, repository_id, repository_name, title, summary, severity,
 Evidence status: `verified|needs_investigation`. Status: `open|resolved|dismissed`.
 Evidence: `{path, start_line, end_line, snippet, source_url, commit_sha, role}`.
 
-Run: `{id, repository_id, repository_name, pr_number, title,
+Run: `{id, repository_id, repository_name, kind: "analyze"|"index", pr_number, title,
  status: "queued"|"running"|"completed"|"failed", created_at, completed_at,
  alert_count, error, stages: [{name, status, summary, duration_ms}]}`.
 
