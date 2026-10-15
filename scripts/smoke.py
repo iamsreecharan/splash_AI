@@ -44,6 +44,14 @@ def main():
             time.sleep(0.5)
         raise TimeoutError(f"Run {job_id} did not finish")
 
+    def report(job_id):
+        req = urllib.request.Request(
+            f"{args.url.rstrip('/')}/api/runs/{job_id}/report",
+            headers={"Accept": "text/markdown"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return response.read().decode("utf-8"), response.headers
+
     results = []
     _, config = request("/api/public/config")
     check(config.get("demo_mode") is True, "Explicit local demo mode is enabled")
@@ -76,6 +84,13 @@ def main():
         excerpt = "\n".join(source["content"].splitlines()[evidence["start_line"] - 1:evidence["end_line"]])
         citations_match &= excerpt == evidence["snippet"] and source["commit_sha"] == evidence["commit_sha"]
     check(citations_match, "Every cited excerpt matches the stored source snapshot exactly")
+    exported, headers = report(run["id"])
+    check(headers.get_content_type() == "text/markdown"
+          and headers.get("Cache-Control") == "no-store"
+          and "attachment" in headers.get("Content-Disposition", ""),
+          "Analysis reports download as Markdown without browser caching")
+    check(run["id"] in exported and all(item["snippet"] in exported for item in alert["evidence"]),
+          "Downloaded report identifies its run and preserves every cited source excerpt")
     _, feedback = request(f"/api/alerts/{alert['id']}/feedback", {"kind": "useful"})
     check(feedback["feedback"] == "useful", "Useful feedback persists")
     _, feedback = request(f"/api/alerts/{alert['id']}/feedback", {"kind": "resolved"})
@@ -85,6 +100,26 @@ def main():
     safe_run = await_run(queued["job_id"])
     check(safe_run["alert_count"] == 0 and len(safe_run["stages"]) == 4,
           "Harmless field addition finishes with zero alerts")
+    safe_report, _ = report(safe_run["id"])
+    check(safe_run["id"] in safe_report and "Stored findings in this run: 0" in safe_report
+          and "machine.temperature" not in safe_report,
+          "Harmless-change report does not include another run's findings")
+
+    history_query = urllib.parse.urlencode({"repository_id": repository_id, "status": "completed",
+                                            "kind": "analyze", "q": "42", "limit": 1})
+    _, history = request(f"/api/runs?{history_query}")
+    check(history["total"] >= 1 and len(history["items"]) == 1
+          and history["items"][0]["id"] == run["id"],
+          "Analysis history filters by project, status, kind, and pull request")
+    _, first_page = request("/api/runs?limit=1&offset=0")
+    _, next_page = request("/api/runs?limit=1&offset=1")
+    check(first_page["total"] == next_page["total"] and first_page["has_more"]
+          and len(next_page["items"]) == 1
+          and first_page["items"][0]["id"] != next_page["items"][0]["id"],
+          "History pages have distinct runs and consistent totals")
+    _, no_matches = request("/api/runs?q=not-a-real-pr-94825")
+    check(no_matches["items"] == [] and no_matches["total"] == 0 and not no_matches["has_more"],
+          "Unmatched history searches return an empty page and zero count")
     try:
         request("/api/webhooks/github", {"forged": True})
     except urllib.error.HTTPError as exc:
@@ -95,7 +130,8 @@ def main():
     if args.verify_deletion:
         request(f"/api/repositories/{repository_id}", method="DELETE")
         for path in (f"/api/repositories/{repository_id}/status", f"/api/alerts/{alert['id']}",
-                     f"/api/runs/{run['id']}", f"/api/repositories/{repository_id}/source?{query}"):
+                     f"/api/runs/{run['id']}", f"/api/runs/{run['id']}/report",
+                     f"/api/repositories/{repository_id}/source?{query}"):
             try:
                 request(path)
             except urllib.error.HTTPError as exc:

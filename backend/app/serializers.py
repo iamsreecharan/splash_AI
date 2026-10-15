@@ -26,7 +26,10 @@ def alert_json(alert: Alert, repository: Repository):
 
 
 def run_json(run: AnalysisRun, repository: Repository):
-    fields = ["id", "repository_id", "pr_number", "title", "status", "alert_count", "error", "stages", "metrics"]
+    fields = ["id", "repository_id", "pr_number", "title", "kind", "status", "alert_count", "error", "stages", "metrics"]
+    metrics, payload = run.metrics or {}, run.payload or {}
     return {**{field: getattr(run, field) for field in fields},
             "repository_name": repository.full_name,
+            "base_sha": metrics.get("analysis_base_sha") or payload.get("base_sha") or None,
+            "head_sha": metrics.get("analysis_head_sha") or payload.get("head_sha") or None,
             "created_at": iso(run.created_at), "completed_at": iso(run.completed_at)}

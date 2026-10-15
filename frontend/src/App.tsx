@@ -13,10 +13,12 @@ import {
   Code2,
   ExternalLink,
   FileCode2,
+  FileDown,
   FolderGit2,
   GitBranch,
   GitPullRequest,
   Github,
+  History,
   Layers3,
   LayoutDashboard,
   LoaderCircle,
@@ -40,6 +42,8 @@ import {
   type ReactNode,
 } from "react";
 import { api, friendlyError, safeExternalUrl, setAccessToken } from "./api";
+import { AnalysisHistory } from "./AnalysisHistory";
+import { downloadRunReport } from "./report";
 import type {
   Alert,
   FeedbackKind,
@@ -51,17 +55,21 @@ import type {
   Session,
 } from "./types";
 
-type Page = "Dashboard" | "Projects" | "Impact Center" | "Settings";
+type Page =
+  "Dashboard" | "Projects" | "Impact Center" | "Analysis History" | "Settings";
 const navigation: { name: Page; icon: typeof Activity }[] = [
   { name: "Dashboard", icon: LayoutDashboard },
   { name: "Projects", icon: FolderGit2 },
   { name: "Impact Center", icon: Layers3 },
+  { name: "Analysis History", icon: History },
   { name: "Settings", icon: Settings2 },
 ];
 const pageDescriptions: Record<Page, string> = {
   Dashboard: "A little context. A lot more confidence.",
   Projects: "Your codebase, connected and understood.",
   "Impact Center": "Know what a change touches before it ships.",
+  "Analysis History":
+    "Search past analyses, follow active runs, and review their results.",
   Settings: "Your workspace, integrations, and privacy.",
 };
 
@@ -383,6 +391,7 @@ export default function App() {
   const bootEpoch = useRef(0);
   const workspaceEpoch = useRef(0);
   const refreshEpoch = useRef(0);
+  const runRequestEpoch = useRef(0);
   const workspaceIdentity = useRef<string | null>(null);
   const [page, setPage] = useState<Page>("Dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -400,6 +409,9 @@ export default function App() {
   } | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const selectedRunId = useRef<string | null>(null);
+  selectedRunId.current = selectedRun?.id ?? null;
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [deleteRepository, setDeleteRepository] = useState<Repository | null>(
     null,
   );
@@ -414,6 +426,7 @@ export default function App() {
     if (workspaceIdentity.current !== identity) {
       workspaceIdentity.current = identity;
       workspaceEpoch.current += 1;
+      runRequestEpoch.current += 1;
       setOverview(null);
       setRepositories([]);
       setAlerts([]);
@@ -421,6 +434,7 @@ export default function App() {
       setIntegrations(null);
       setSelectedAlert(null);
       setSelectedRun(null);
+      setHistoryRefreshKey(0);
       setDeleteRepository(null);
       setDataError("");
       setQuery("");
@@ -590,10 +604,42 @@ export default function App() {
     return () => clearInterval(interval);
   }, [session, isProcessing, refresh]);
   useEffect(() => {
-    if (!selectedRun) return;
-    const updated = runs.find((run) => run.id === selectedRun.id);
-    if (updated && updated !== selectedRun) setSelectedRun(updated);
-  }, [runs, selectedRun]);
+    if (!selectedRun || !["queued", "running"].includes(selectedRun.status))
+      return;
+    const epoch = workspaceEpoch.current;
+    const id = selectedRun.id;
+    const requestEpoch = runRequestEpoch.current;
+    let disposed = false;
+    let inFlight = false;
+    const interval = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const result = await api<Run>(`/runs/${encodeURIComponent(id)}`);
+        if (
+          !disposed &&
+          epoch === workspaceEpoch.current &&
+          requestEpoch === runRequestEpoch.current &&
+          selectedRunId.current === id
+        )
+          setSelectedRun(result);
+      } catch (error) {
+        if (
+          !disposed &&
+          epoch === workspaceEpoch.current &&
+          requestEpoch === runRequestEpoch.current &&
+          selectedRunId.current === id
+        )
+          notify(friendlyError(error), true);
+      } finally {
+        inFlight = false;
+      }
+    }, 1500);
+    return () => {
+      disposed = true;
+      clearInterval(interval);
+    };
+  }, [selectedRun?.id, selectedRun?.status, notify]);
 
   async function action(key: string, work: () => Promise<void>) {
     if (busy) return;
@@ -644,6 +690,61 @@ export default function App() {
       if (epoch === workspaceEpoch.current) setSelectedAlert(result);
     });
   }
+  async function openRun(run: Run) {
+    if (busy && !busy.startsWith("run-")) return;
+    const epoch = workspaceEpoch.current;
+    const requestEpoch = ++runRequestEpoch.current;
+    setBusy(`run-${run.id}`);
+    try {
+      const result = await api<Run>(`/runs/${encodeURIComponent(run.id)}`);
+      if (
+        epoch === workspaceEpoch.current &&
+        requestEpoch === runRequestEpoch.current
+      )
+        setSelectedRun(result);
+    } catch (error) {
+      if (
+        epoch === workspaceEpoch.current &&
+        requestEpoch === runRequestEpoch.current
+      )
+        notify(friendlyError(error), true);
+    } finally {
+      if (
+        epoch === workspaceEpoch.current &&
+        requestEpoch === runRequestEpoch.current
+      )
+        setBusy("");
+    }
+  }
+  function closeRun() {
+    runRequestEpoch.current += 1;
+    setSelectedRun(null);
+    if (busy.startsWith("run-") || busy === "report") setBusy("");
+  }
+  async function downloadReport() {
+    if (
+      !selectedRun ||
+      selectedRun.kind !== "analyze" ||
+      selectedRun.status !== "completed"
+    )
+      return;
+    const epoch = workspaceEpoch.current;
+    const auth = authEpoch.current;
+    const requestEpoch = runRequestEpoch.current;
+    const id = selectedRun.id;
+    const isCurrent = () =>
+      epoch === workspaceEpoch.current &&
+      auth === authEpoch.current &&
+      requestEpoch === runRequestEpoch.current &&
+      selectedRunId.current === id;
+    await action("report", async () => {
+      try {
+        await downloadRunReport(id, isCurrent);
+      } catch (error) {
+        if (isCurrent()) throw error;
+      }
+    });
+  }
   async function feedback(kind: FeedbackKind) {
     if (!selectedAlert) return;
     const epoch = workspaceEpoch.current;
@@ -663,6 +764,7 @@ export default function App() {
     });
   }
   const goTo = (destination: Page) => {
+    closeRun();
     setPage(destination);
     setMenuOpen(false);
     setQuery("");
@@ -893,7 +995,9 @@ export default function App() {
                     ? "FOLLOW THE RIPPLE"
                     : page === "Projects"
                       ? "CONNECTED CODEBASES"
-                      : "MAKE IT YOURS"}
+                      : page === "Analysis History"
+                        ? "YOUR RUN HISTORY"
+                        : "MAKE IT YOURS"}
               </span>
               <h1>
                 {page === "Dashboard"
@@ -902,7 +1006,9 @@ export default function App() {
                     ? "Impact Center"
                     : page === "Projects"
                       ? "Your projects."
-                      : "Workspace settings."}
+                      : page === "Analysis History"
+                        ? "Analysis history"
+                        : "Workspace settings."}
               </h1>
               <p>{pageDescriptions[page]}</p>
             </div>
@@ -935,6 +1041,12 @@ export default function App() {
               >
                 Retry
               </button>
+            </div>
+          )}
+          {busy.startsWith("run-") && (
+            <div className="run-opening-notice" role="status">
+              <Spinner />
+              Opening run details…
             </div>
           )}
           {loading && !overview ? (
@@ -1018,8 +1130,8 @@ export default function App() {
                         </h2>
                         <p>
                           {sampleRepository
-                            ? "Compare a breaking rename with a safe edit. Splash checks actual source dependencies and shows its evidence."
-                            : "Try a sample Python project. Rename an exported function and watch Splash trace the impact to its callers."}
+                            ? "Compare a renamed API response field with a safe edit. Splash traces the effect on the interface and shows the source evidence."
+                            : "Try a sample FastAPI and TypeScript project. Rename a response field and see where the interface still reads its old name."}
                         </p>
                         <div className="demo-banner-notes">
                           <span>
@@ -1128,7 +1240,12 @@ export default function App() {
                           <h2>Analysis activity</h2>
                           <p>From change to understanding.</p>
                         </div>
-                        <Activity size={19} className="muted" />
+                        <button
+                          className="text-button"
+                          onClick={() => goTo("Analysis History")}
+                        >
+                          View history <ArrowUpRight size={15} />
+                        </button>
                       </div>
                       <div className="activity-list">
                         {runs.length ? (
@@ -1136,7 +1253,7 @@ export default function App() {
                             <button
                               className="activity-item"
                               key={run.id}
-                              onClick={() => setSelectedRun(run)}
+                              onClick={() => void openRun(run)}
                             >
                               <span
                                 className={`activity-icon ${run.status}`}
@@ -1153,12 +1270,15 @@ export default function App() {
                               <span className="activity-body">
                                 <strong>
                                   {run.title ||
-                                    `Pull request #${run.pr_number}`}
+                                    (run.kind === "index"
+                                      ? "Repository indexing"
+                                      : "Change analysis")}
                                 </strong>
                                 <span>{run.repository_name}</span>
                                 <small>
                                   <Badge kind={run.status} />
                                   {run.status === "completed" &&
+                                    run.kind === "analyze" &&
                                     `${run.alert_count} ${run.alert_count === 1 ? "impact" : "impacts"}`}
                                   <span>{timeAgo(run.created_at)}</span>
                                 </small>
@@ -1506,6 +1626,14 @@ export default function App() {
                     )}
                   </section>
                 </>
+              )}
+              {page === "Analysis History" && (
+                <AnalysisHistory
+                  workspaceKey={`${session.user.id}:${session.organization.id}`}
+                  repositories={repositories}
+                  onOpenRun={(run) => void openRun(run)}
+                  refreshKey={historyRefreshKey}
+                />
               )}
               {page === "Settings" && (
                 <div className="settings-stack">
@@ -1870,27 +1998,82 @@ export default function App() {
       )}
       {selectedRun && (
         <Dialog
-          onClose={() => setSelectedRun(null)}
+          onClose={closeRun}
           title="Analysis details"
           className="run-dialog"
         >
           <div className="dialog-eyebrow">
             <Badge kind={selectedRun.status} />
             <span>
-              {selectedRun.repository_name} · PR #{selectedRun.pr_number}
+              {selectedRun.repository_name} ·{" "}
+              {selectedRun.kind === "index" ? "Indexing" : "Analysis"}
+              {selectedRun.kind === "analyze" && selectedRun.pr_number > 0
+                ? ` · PR #${selectedRun.pr_number}`
+                : ""}
             </span>
           </div>
-          <h2>{selectedRun.title || "Change analysis"}</h2>
+          <h2>
+            {selectedRun.title ||
+              (selectedRun.kind === "index"
+                ? "Repository indexing"
+                : "Change analysis")}
+          </h2>
           <p className="dialog-summary">
-            A controlled path from changed source to an evidence-backed finding.
+            {selectedRun.kind === "index"
+              ? "Indexing prepares source files for future change analysis."
+              : "Review the change analysis and the evidence behind its findings."}
           </p>
           <div className="run-result">
-            <strong>{selectedRun.alert_count}</strong>
-            <span>
-              {selectedRun.alert_count === 1 ? "impact found" : "impacts found"}
-            </span>
+            {selectedRun.kind === "analyze" &&
+            selectedRun.status === "completed" ? (
+              <>
+                <strong>{selectedRun.alert_count}</strong>
+                <span>
+                  {selectedRun.alert_count === 1
+                    ? "impact found"
+                    : "impacts found"}
+                </span>
+              </>
+            ) : (
+              <span className="run-progress-label">
+                {selectedRun.kind === "index"
+                  ? selectedRun.status === "completed"
+                    ? "Indexing completed"
+                    : selectedRun.status === "failed"
+                      ? "Indexing did not complete"
+                      : selectedRun.status === "queued"
+                        ? "Indexing queued"
+                        : "Indexing in progress"
+                  : selectedRun.status === "failed"
+                    ? "Analysis did not complete"
+                    : selectedRun.status === "queued"
+                      ? "Analysis queued"
+                      : "Analysis in progress"}
+              </span>
+            )}
             <span>{timeAgo(selectedRun.created_at)}</span>
           </div>
+          {(selectedRun.base_sha || selectedRun.head_sha) &&
+            selectedRun.kind === "analyze" && (
+              <dl className="run-snapshots">
+                {selectedRun.base_sha && (
+                  <div>
+                    <dt>Base snapshot</dt>
+                    <dd>
+                      <code>{selectedRun.base_sha}</code>
+                    </dd>
+                  </div>
+                )}
+                {selectedRun.head_sha && (
+                  <div>
+                    <dt>Head snapshot</dt>
+                    <dd>
+                      <code>{selectedRun.head_sha}</code>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            )}
           {selectedRun.error && (
             <div className="inline-error" role="alert">
               {selectedRun.error}
@@ -1902,16 +2085,36 @@ export default function App() {
               disabled={!!busy}
               onClick={() =>
                 void action("retry-run", async () => {
-                  await api(
-                    `/runs/${encodeURIComponent(selectedRun.id)}/retry`,
-                    { method: "POST" },
+                  const epoch = workspaceEpoch.current;
+                  const requestEpoch = runRequestEpoch.current;
+                  const id = selectedRun.id;
+                  await api(`/runs/${encodeURIComponent(id)}/retry`, {
+                    method: "POST",
+                  });
+                  if (
+                    epoch !== workspaceEpoch.current ||
+                    requestEpoch !== runRequestEpoch.current
+                  )
+                    return;
+                  const updated = await api<Run>(
+                    `/runs/${encodeURIComponent(id)}`,
                   );
+                  if (
+                    epoch !== workspaceEpoch.current ||
+                    requestEpoch !== runRequestEpoch.current
+                  )
+                    return;
+                  setSelectedRun(updated);
+                  setHistoryRefreshKey((key) => key + 1);
                   await refresh();
-                  notify("Analysis queued for retry.");
+                  notify("Run queued for retry.");
                 })
               }
             >
-              Retry analysis <ArrowRight size={14} />
+              {selectedRun.kind === "index"
+                ? "Retry indexing"
+                : "Retry analysis"}{" "}
+              <ArrowRight size={14} />
             </button>
           )}
           <div className="run-stages">
@@ -1929,7 +2132,14 @@ export default function App() {
                     <h3>
                       {titleCase(stage.name)} <Badge kind={stage.status} />
                     </h3>
-                    <p>{stage.summary || "Waiting for analysis."}</p>
+                    <p>
+                      {stage.summary ||
+                        (stage.status === "completed"
+                          ? "Stage completed."
+                          : stage.status === "failed"
+                            ? "Stage did not complete."
+                            : "Waiting for stage results.")}
+                    </p>
                   </div>
                   <small>
                     {stage.duration_ms
@@ -1938,22 +2148,38 @@ export default function App() {
                   </small>
                 </div>
               ))
-            ) : (
+            ) : ["queued", "running"].includes(selectedRun.status) ? (
               <div className="loading-panel">
                 <Spinner /> Waiting for stage results…
               </div>
+            ) : (
+              <p className="run-no-trace">
+                No stage trace was recorded for this run.
+              </p>
             )}
           </div>
-          <button
-            className="button primary"
-            onClick={() => {
-              setSelectedRun(null);
-              setStatus("all");
-              goTo("Impact Center");
-            }}
-          >
-            View impacts <ArrowRight size={15} />
-          </button>
+          {selectedRun.kind === "analyze" &&
+            selectedRun.status === "completed" && (
+              <div className="run-detail-actions">
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setStatus("all");
+                    goTo("Impact Center");
+                  }}
+                >
+                  Open Impact Center <ArrowRight size={15} />
+                </button>
+                <button
+                  className="button secondary"
+                  disabled={!!busy}
+                  onClick={() => void downloadReport()}
+                >
+                  {busy === "report" ? <Spinner /> : <FileDown size={16} />}
+                  Download report
+                </button>
+              </div>
+            )}
         </Dialog>
       )}
       {deleteRepository && (

@@ -7,10 +7,10 @@ export function setAccessToken(value: string | null) {
   token = value;
 }
 
-export async function api<T>(
+async function request(
   path: string,
   options: RequestInit = {},
-): Promise<T> {
+): Promise<Response> {
   const headers = new Headers(options.headers);
   if (options.body) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -33,8 +33,26 @@ export async function api<T>(
     }
     throw new Error(message);
   }
+  return response;
+}
+
+export async function api<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await request(path, options);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+export async function apiText(
+  path: string,
+  options: RequestInit = {},
+): Promise<string> {
+  const headers = new Headers(options.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "text/markdown");
+  const response = await request(path, { ...options, headers });
+  return response.text();
 }
 
 export function friendlyError(error: unknown) {

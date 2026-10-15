@@ -51,6 +51,7 @@ export interface Alert {
 }
 export interface Run {
   id: string;
+  kind: "index" | "analyze";
   repository_id: string;
   repository_name: string;
   pr_number: number;
@@ -60,12 +61,21 @@ export interface Run {
   completed_at: string | null;
   alert_count: number;
   error: string | null;
+  base_sha?: string | null;
+  head_sha?: string | null;
   stages: {
     name: string;
     status: string;
     summary: string;
     duration_ms: number;
   }[];
+}
+export interface RunPage {
+  items: Run[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
 }
 export interface Session {
   user: { id: string; name: string; email: string };

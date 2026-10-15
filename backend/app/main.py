@@ -12,9 +12,9 @@ import redis
 from cryptography.fernet import InvalidToken
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import String, cast, delete, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,6 +26,7 @@ from app.github import (GitHubClient, GitHubError, decrypt_token, encrypt_token,
 from app.models import (Alert, AnalysisRun, ChangeEvent, Feedback, Installation,
                         OAuthAttempt, Repository, Snapshot, WebhookDelivery, utcnow)
 from app.serializers import alert_json, iso, repository_json, run_json
+from app.reports import render_analysis_report, report_filename
 from app.tasks import EnqueueError, demo_snapshot_id, enqueue_run, stored_snapshot
 
 
@@ -268,12 +269,34 @@ def feedback(alert_id: str, body: FeedbackInput,
 
 
 @app.get("/api/runs")
-def runs(limit: int = Query(100, ge=1, le=500), identity: Identity = Depends(current_identity), db: Session = Depends(get_db)):
+def runs(limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0, le=1_000_000),
+         status: Literal["queued", "running", "completed", "failed"] | None = None,
+         repository_id: str | None = None, q: str | None = Query(None, max_length=200),
+         kind: Literal["index", "analyze"] | None = None,
+         identity: Identity = Depends(current_identity), db: Session = Depends(get_db)):
+    # Resolve visibility before either count or pagination. Revoked/other-tenant
+    # runs must never consume a page or contribute to the reported total.
+    allowed_ids = ([authorized_repository(db, identity, repository_id).id] if repository_id is not None
+                   else [repo.id for repo in visible_repositories(db, identity)])
+    conditions = [Repository.organization_id == identity.organization_id,
+                  Repository.active.is_(True), AnalysisRun.repository_id.in_(allowed_ids)]
+    if status:
+        conditions.append(AnalysisRun.status == status)
+    if kind:
+        conditions.append(AnalysisRun.kind == kind)
+    if q:
+        if "\x00" in q:
+            raise HTTPException(422, "Search text must not contain null characters.")
+        conditions.append(or_(AnalysisRun.title.icontains(q, autoescape=True),
+                              Repository.full_name.icontains(q, autoescape=True),
+                              cast(AnalysisRun.pr_number, String).icontains(q, autoescape=True)))
+    total = db.scalar(select(func.count()).select_from(AnalysisRun)
+                      .join(Repository, AnalysisRun.repository_id == Repository.id).where(*conditions))
     rows = db.execute(select(AnalysisRun, Repository).join(Repository, AnalysisRun.repository_id == Repository.id)
-                       .where(Repository.organization_id == identity.organization_id, Repository.active.is_(True))
-                       .order_by(AnalysisRun.created_at.desc()).limit(limit)).all()
-    allowed_ids = {repo.id for repo in visible_repositories(db, identity)}
-    return {"items": [run_json(run, repo) for run, repo in rows if repo.id in allowed_ids]}
+                       .where(*conditions).order_by(AnalysisRun.created_at.desc(), AnalysisRun.id.desc())
+                       .offset(offset).limit(limit)).all()
+    return {"items": [run_json(run, repo) for run, repo in rows], "total": total,
+            "limit": limit, "offset": offset, "has_more": offset + len(rows) < total}
 
 
 @app.get("/api/runs/{run_id}")
@@ -285,6 +308,24 @@ def run_detail(run_id: str, identity: Identity = Depends(current_identity), db: 
         raise HTTPException(404, "Run not found.")
     check_github_access(db, identity, row[1])
     return run_json(*row)
+
+
+@app.get("/api/runs/{run_id}/report")
+def run_report(run_id: str, identity: Identity = Depends(current_identity), db: Session = Depends(get_db)):
+    row = db.execute(select(AnalysisRun, Repository).join(Repository, AnalysisRun.repository_id == Repository.id)
+                     .where(AnalysisRun.id == run_id, Repository.organization_id == identity.organization_id,
+                            Repository.active.is_(True))).first()
+    if not row:
+        raise HTTPException(404, "Run not found.")
+    run, repository = row
+    check_github_access(db, identity, repository)
+    if run.kind != "analyze" or run.status != "completed":
+        raise HTTPException(409, "Reports are available only for completed analysis runs.")
+    findings = db.scalars(select(Alert).where(Alert.run_id == run.id, Alert.repository_id == repository.id)
+                         .order_by(Alert.created_at, Alert.id)).all()
+    return Response(render_analysis_report(run, repository, findings), media_type="text/markdown",
+                    headers={"Content-Disposition": f'attachment; filename="{report_filename(run.id)}"',
+                             "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @app.post("/api/runs/{run_id}/retry", status_code=202)
