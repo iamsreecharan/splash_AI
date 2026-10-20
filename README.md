@@ -1,20 +1,18 @@
 # Splash
 
-Splash helps you find the other code a pull request might break.
+Splash checks pull requests for changes that could break other code in the same
+repository.
 
-For example, a backend PR renames a JSON field from `temperature` to
-`current_temperature`, but the frontend still reads `machine.temperature`.
-Splash points out the mismatch and shows the source lines on both sides, so you
-can check the finding yourself.
+The sample project shows the kind of problem it looks for: an API renames
+`temperature` to `current_temperature`, but a TypeScript component still reads
+`machine.temperature`. Splash flags the mismatch and shows the source lines
+behind it, so you can check the finding before fixing anything.
 
-The app runs locally. You can try the sample project without creating accounts
-or paying for an AI API. GitHub and OpenAI connections are optional setup steps.
+## Run it locally
 
-## Try it
-
-You'll need Git, Make, Docker with Compose v2, and Python 3 for the smoke check.
-The commands below use a Linux, macOS, or WSL shell. Allow about 4 GB of free
-memory for the containers.
+The demo needs no accounts or API keys. You'll need Git, Make, Docker with
+Compose v2, and Python 3 for the smoke check. Use a Linux, macOS, or WSL shell
+and allow about 4 GB of free memory for the containers.
 
 ```sh
 git clone https://github.com/iamsreecharan/splash_AI.git
@@ -22,77 +20,70 @@ cd splash_AI
 make up
 ```
 
-Open **http://localhost:5173** on your computer and choose **Try sample project**.
-Try the field rename, then the harmless change. Both go through the real indexer
-and analysis worker using the bundled source files.
+Open http://localhost:5173 and choose **Try sample project**. Try the field
+rename, then the harmless change. The demo indexes the bundled files and runs
+the same analysis worker used for GitHub PRs. Paid AI is off by default.
 
-In **Analysis History**, you can find older runs by project, status, title, or PR
-number. Open a completed analysis and choose **Download report** to save its
-findings and source excerpts as Markdown. Reports also record when a supported
-analysis found no impacts.
-
-`make up` creates `.env` if you don't have one, builds the app, and starts the
-database, queue, API, background workers, and web server. It keeps an existing
-`.env`. Services bind to localhost. Keep demo mode on your own machine; configure
-authentication before exposing the app to other people.
+`make up` creates `.env` if it's missing and starts the app, database, queue,
+worker, and recovery scheduler. It leaves an existing `.env` alone. The services
+listen on localhost; keep demo mode on your own machine until you've configured
+authentication.
 
 ```sh
-make smoke               # check the running API and analysis worker
-make logs                # watch service logs
-make down                # stop the app and keep its data
+make smoke   # check the running API and worker
+make logs    # watch service logs
+make down    # stop the app and keep its data
 ```
 
-To start over completely, `docker compose down -v` deletes this stack's database
-and queue volumes.
+To erase the local database and queue as well, run `docker compose down -v`.
 
-## What's working
+## What it checks
 
-- A dashboard for connected projects, alerts, and recent activity.
-- A read-only GitHub App connection, repository indexing, and PR webhooks.
-- Python and JavaScript/TypeScript source indexing, with source and documentation
-  search and optional semantic retrieval through pgvector.
-- Background analysis that checks changes, follows supported dependencies,
-  verifies evidence, and suggests what to review.
-- Alerts with exact source excerpts, useful/irrelevant feedback, and resolution
-  tracking.
-- Searchable analysis history and downloadable Markdown reports.
-- Supabase sign-in, separate user workspaces, and repository data deletion.
-- Optional OpenAI explanations with request limits. Paid AI is off by default.
+Current detection covers specific FastAPI routes and JSON response fields used
+by JavaScript or TypeScript `fetch` calls. Dynamic URLs, client wrappers, other
+frameworks, and cross-repository changes still need manual review. A run with no
+findings doesn't prove that a PR is safe.
 
-The first release focuses on FastAPI routes and JSON response fields consumed
-through literal JavaScript/TypeScript `fetch` calls. Dynamic URLs, client
-wrappers, other frameworks, and many other kinds of breaking changes aren't
-covered yet. A completed run with no findings doesn't prove that a PR is safe.
+Open an alert to see the affected code and suggested next steps. You can mark
+the finding useful, irrelevant, or resolved. **Analysis History** lets you find
+past runs by project, status, title, or PR number. A completed analysis has a
+**Download report** button that saves its findings and source excerpts as
+Markdown, including when there are no findings.
 
-Linear, Slack, chat, suggested patches, and editor extensions are still planned.
+Linear, Slack, chat, suggested patches, and editor extensions are planned for
+later releases.
 
-## Use your own repositories
+## Connect a GitHub repository
 
 1. Set up [Supabase Auth](docs/supabase-auth.md), turn off demo mode, and sign in.
 2. Create and install the [GitHub App](docs/github-app.md). GitHub needs a secure
-   tunnel to deliver webhooks to your local app. Follow the guide for callback
-   URLs.
-3. Connect GitHub in Splash, select a repository, and index it. Open or update a
-   pull request to start an analysis.
+   tunnel to deliver webhooks to a local app; the guide explains the callback
+   URLs too.
+3. Connect GitHub in Splash, select a repository, and index it. Opening or
+   updating a pull request starts an analysis.
 
-The app reads repository contents and PRs. It doesn't execute your code, push
-changes, or merge pull requests. Removing a project deletes its stored source,
-analysis history, and alerts from Splash's active database. Downloaded reports
-are separate files; delete those yourself if you no longer need them.
+Splash reads repository source. It doesn't execute that code, push changes, or
+merge PRs. Removing a project deletes its source, analyses, and alerts from
+Splash's active database. Reports you've downloaded remain on your computer.
 
-Store credentials in `.env`, `.secrets`, or private environment settings. These
-local files are ignored by Git. See [privacy](docs/privacy.md) for what optional
-AI calls send, [costs](docs/costs.md) for the limits, and
-[security](docs/security.md) for the access model.
+Keep credentials in `.env`, `.secrets`, or private environment settings. The
+local credential files are ignored by Git. OpenAI is optional; see
+[privacy](docs/privacy.md) for what gets sent and [costs](docs/costs.md) for the
+configured limits. The [security guide](docs/security.md) explains access checks
+and data removal.
 
-## Work on the code
+The local demo has been tested. Live GitHub, Supabase, and OpenAI connections
+still need to be checked with your account settings; see the
+[validation notes](docs/validation.md).
 
-The frontend uses React, TypeScript, and Vite. The backend uses FastAPI,
-PostgreSQL 16 with pgvector, Redis, and Celery. LangGraph connects the four
-analysis stages.
+## Development
 
-Follow [local development](docs/local-development.md) to install Python and Node
-dependencies and run services with reload. Then run:
+The web app uses React, TypeScript, and Vite. Python and FastAPI handle the API;
+Celery runs background jobs through Redis. PostgreSQL 16 stores the data, with
+pgvector for optional semantic search. LangGraph connects the analysis stages.
+
+Follow [local development](docs/local-development.md) to install the Python and
+Node dependencies and start services with reload. Then run:
 
 ```sh
 make test
@@ -100,18 +91,9 @@ python3 scripts/smoke.py
 cd tests/e2e && npm ci && npx playwright install chromium && npm test
 ```
 
-The smoke check uses the running local demo and saves its results in `.splash/`.
-Add `--verify-deletion` to check that removing the sample also erases its stored
-data. That option deletes the sample project.
+The smoke check uses the running demo and writes results to `.splash/`. Add
+`--verify-deletion` to check data removal too; that option deletes the sample
+project.
 
-[Architecture](docs/architecture.md) describes the API and analysis flow.
-[Validation notes](docs/validation.md) list what has been tested and what still
-needs real account configuration. The local workflow is tested; a live GitHub,
-Supabase, and OpenAI setup still needs to be checked with your account settings.
-
-## Hosting later
-
-Start locally to keep costs down. The [Render guide](docs/deployment.md) covers
-a hosted pilot, including the database, queue, workers, and authentication.
-Running the whole stack reliably on free hosting isn't assumed, and this repo
-doesn't create cloud resources for you.
+See [architecture](docs/architecture.md) for the API and analysis flow, or the
+[Render guide](docs/deployment.md) when you're ready to plan a hosted pilot.
